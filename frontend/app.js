@@ -1,6 +1,7 @@
 // ============================================
-// Atomiser Dashboard - Enhanced Application
-// Radial Gauges, Notifications, Derived Metrics
+// Atomiser Dashboard v2.0 - Enhanced Application
+// Radial Gauges, Notifications, Derived Metrics,
+// Schedules, Export, Themes, Sparklines, Alerts
 // ============================================
 
 const API_BASE = window.location.origin;
@@ -11,6 +12,7 @@ let chart = null;
 let chartRange = '1h';
 let reconnectTimer = null;
 let tempGauge, humGauge;
+let tempSparkline, humSparkline;
 
 // ============================================
 // State
@@ -31,6 +33,25 @@ let state = {
 let tempMin = Infinity, tempMax = -Infinity;
 let humMin = Infinity, humMax = -Infinity;
 
+// Trend tracking
+let tempHistory = [];
+let humHistory = [];
+
+// Runtime counter
+let atomiserStartTime = null;
+let runtimeInterval = null;
+
+// Schedules (stored in localStorage)
+let schedules = JSON.parse(localStorage.getItem('atomiser_schedules') || '[]');
+
+// Alert settings
+let alertSoundEnabled = JSON.parse(localStorage.getItem('atomiser_alert_sound') ?? 'true');
+let tempUnit = localStorage.getItem('atomiser_temp_unit') || 'C';
+let alertThresholds = JSON.parse(localStorage.getItem('atomiser_alert_thresholds') || '{"highTemp":40,"lowHum":25,"highHum":85}');
+
+// All cached events for filtering
+let allEvents = [];
+
 // ============================================
 // Initialize
 // ============================================
@@ -38,6 +59,8 @@ document.addEventListener('DOMContentLoaded', () => {
   chart = new SensorChart('chart');
   tempGauge = new RadialGauge('tempGauge', { min: 0, max: 50, color: '#fb923c', glowColor: 'rgba(251,146,60,0.3)', label: '°C' });
   humGauge = new RadialGauge('humGauge', { min: 0, max: 100, color: '#38bdf8', glowColor: 'rgba(56,189,248,0.3)', label: '%' });
+  tempSparkline = new SparklineChart('tempSparkline', 'rgb(251, 146, 60)');
+  humSparkline = new SparklineChart('humSparkline', 'rgb(56, 189, 248)');
 
   createBgParticles();
   startClock();
@@ -46,6 +69,21 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchReadings();
   fetchEvents();
   updateThresholdFill();
+  loadTheme();
+  loadTempUnit();
+  loadAlertSettings();
+  updateAlertSoundBtn();
+  renderSchedules();
+  initDayPicker();
+
+  // Check schedules every minute
+  setInterval(checkSchedules, 60000);
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+    if (e.key === 't' && e.ctrlKey) { e.preventDefault(); toggleTheme(); }
+  });
 });
 
 // ============================================
@@ -77,6 +115,39 @@ function startClock() {
   };
   tick();
   setInterval(tick, 1000);
+}
+
+// ============================================
+// Theme Toggle
+// ============================================
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  const isLight = document.body.classList.contains('light');
+  localStorage.setItem('atomiser_theme', isLight ? 'light' : 'dark');
+  const icon = document.getElementById('themeIcon');
+  icon.innerHTML = isLight
+    ? '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'
+    : '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>';
+}
+
+function loadTheme() {
+  const theme = localStorage.getItem('atomiser_theme');
+  if (theme === 'light') {
+    document.body.classList.add('light');
+    const icon = document.getElementById('themeIcon');
+    icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+  }
+}
+
+// ============================================
+// Fullscreen
+// ============================================
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
 }
 
 // ============================================
@@ -200,9 +271,10 @@ function showToast(message, type = 'info') {
     success: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
     error: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
     info: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+    warning: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
   };
 
-  toast.innerHTML = `${icons[type] || icons.info}<span>${message}</span>`;
+  toast.innerHTML = `${icons[type] || icons.info}<span>${escapeHtml(message)}</span>`;
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 4000);
 }
@@ -218,7 +290,6 @@ function connectWebSocket() {
   ws = new WebSocket(WS_URL);
 
   ws.onopen = () => {
-    console.log('WebSocket connected');
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
@@ -233,19 +304,29 @@ function connectWebSocket() {
       updateState(data);
       chart.addPoint(data.temperature, data.humidity);
 
+      // Sparklines
+      if (tempSparkline) tempSparkline.addPoint(data.temperature);
+      if (humSparkline) humSparkline.addPoint(data.humidity);
+
+      // Update chart stats
+      updateChartStats();
+
       if (!prevConnected && data.connected) {
         showToast('Connected to ESP32', 'success');
       }
       if (prevAtomiser !== data.atomiserOn && data.connected) {
         showToast(`Atomiser ${data.atomiserOn ? 'activated' : 'deactivated'}`, data.atomiserOn ? 'info' : 'success');
       }
+
+      // Check alert thresholds
+      checkAlertThresholds(data);
+
     } catch (e) {
       console.error('WS message error:', e);
     }
   };
 
   ws.onclose = () => {
-    console.log('WebSocket disconnected');
     state.connected = false;
     updateUI();
     scheduleReconnect();
@@ -263,6 +344,80 @@ function scheduleReconnect() {
     reconnectTimer = null;
     connectWebSocket();
   }, 3000);
+}
+
+// ============================================
+// Alert Thresholds
+// ============================================
+function checkAlertThresholds(data) {
+  if (!data.connected) return;
+  const t = data.temperature;
+  const h = data.humidity;
+
+  if (t > alertThresholds.highTemp) {
+    showToast(`High temp alert: ${t.toFixed(1)}°C`, 'warning');
+  }
+  if (h < alertThresholds.lowHum) {
+    showToast(`Low humidity alert: ${h.toFixed(1)}%`, 'warning');
+  }
+  if (h > alertThresholds.highHum) {
+    showToast(`High humidity alert: ${h.toFixed(1)}%`, 'warning');
+  }
+}
+
+function saveAlertThresholds() {
+  alertThresholds.highTemp = parseInt(document.getElementById('highTempAlert').value) || 40;
+  alertThresholds.lowHum = parseInt(document.getElementById('lowHumAlert').value) || 25;
+  alertThresholds.highHum = parseInt(document.getElementById('highHumAlert').value) || 85;
+  localStorage.setItem('atomiser_alert_thresholds', JSON.stringify(alertThresholds));
+  showToast('Alert thresholds saved', 'success');
+}
+
+function loadAlertSettings() {
+  document.getElementById('highTempAlert').value = alertThresholds.highTemp;
+  document.getElementById('lowHumAlert').value = alertThresholds.lowHum;
+  document.getElementById('highHumAlert').value = alertThresholds.highHum;
+}
+
+function toggleAlertSound() {
+  alertSoundEnabled = !alertSoundEnabled;
+  localStorage.setItem('atomiser_alert_sound', JSON.stringify(alertSoundEnabled));
+  updateAlertSoundBtn();
+  showToast(`Alerts ${alertSoundEnabled ? 'enabled' : 'disabled'}`, 'info');
+}
+
+function updateAlertSoundBtn() {
+  const btn = document.getElementById('alertSoundBtn');
+  if (btn) {
+    btn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      Alerts: ${alertSoundEnabled ? 'On' : 'Off'}
+    `;
+  }
+}
+
+// ============================================
+// Temperature Unit
+// ============================================
+function setTempUnit(unit) {
+  tempUnit = unit;
+  localStorage.setItem('atomiser_temp_unit', unit);
+  loadTempUnit();
+  updateUI();
+}
+
+function loadTempUnit() {
+  document.getElementById('unitC').classList.toggle('active', tempUnit === 'C');
+  document.getElementById('unitF').classList.toggle('active', tempUnit === 'F');
+  document.getElementById('currentTempUnit').textContent = tempUnit === 'C' ? 'Celsius (°C)' : 'Fahrenheit (°F)';
+}
+
+function toDisplayTemp(celsius) {
+  return tempUnit === 'F' ? (celsius * 9 / 5) + 32 : celsius;
+}
+
+function tempUnitLabel() {
+  return tempUnit === 'F' ? '°F' : '°C';
 }
 
 // ============================================
@@ -291,8 +446,6 @@ async function fetchReadings() {
     const readings = await res.json();
     if (readings.length > 0) {
       chart.setData(readings);
-
-      // Update min/max from history
       readings.forEach(r => {
         if (r.temperature < tempMin) tempMin = r.temperature;
         if (r.temperature > tempMax) tempMax = r.temperature;
@@ -300,6 +453,7 @@ async function fetchReadings() {
         if (r.humidity > humMax) humMax = r.humidity;
       });
       updateMinMax();
+      updateChartStats();
     }
   } catch (e) {
     console.error('Failed to fetch readings:', e);
@@ -308,9 +462,9 @@ async function fetchReadings() {
 
 async function fetchEvents() {
   try {
-    const res = await fetch(`${API_BASE}/api/events?limit=30`);
-    const events = await res.json();
-    renderEvents(events);
+    const res = await fetch(`${API_BASE}/api/events?limit=50`);
+    allEvents = await res.json();
+    filterEvents();
   } catch (e) {
     console.error('Failed to fetch events:', e);
   }
@@ -391,7 +545,7 @@ async function updateEspIp() {
     if (data.success) {
       input.value = '';
       document.getElementById('currentIpDisplay').textContent = ip;
-      showToast(`ESP32 IP updated to ${ip}`, 'success');
+      showToast(`ESP32 IP updated to ${escapeHtml(ip)}`, 'success');
     }
   } catch (e) {
     showToast('Failed to update IP', 'error');
@@ -399,13 +553,28 @@ async function updateEspIp() {
 }
 
 // ============================================
-// Chart Range
+// Chart Controls
 // ============================================
 function setChartRange(range, btn) {
   chartRange = range;
-  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.chip[data-range]').forEach(c => c.classList.remove('active'));
   if (btn) btn.classList.add('active');
   fetchReadings();
+}
+
+function toggleChartLine(line, btn) {
+  if (chart) chart.toggleLine(line);
+  if (btn) btn.classList.toggle('active');
+}
+
+function updateChartStats() {
+  if (!chart) return;
+  const stats = chart.getStats();
+  if (!stats) return;
+  document.getElementById('csAvgTemp').textContent = stats.avgTemp + '°';
+  document.getElementById('csAvgHum').textContent = stats.avgHum + '%';
+  document.getElementById('csCount').textContent = stats.count;
+  document.getElementById('csDuration').textContent = stats.duration;
 }
 
 // ============================================
@@ -423,6 +592,11 @@ function updateThresholdFill() {
   slider.style.background = `linear-gradient(to right, #0ea5e9 0%, #0ea5e9 ${pct}%, rgba(71,85,105,0.3) ${pct}%)`;
 }
 
+function updateHystLabel() {
+  const val = document.getElementById('hystSlider').value;
+  document.getElementById('hystBadge').textContent = `\u00B1${val}%`;
+}
+
 // ============================================
 // Derived Metrics
 // ============================================
@@ -434,11 +608,21 @@ function calcDewPoint(t, rh) {
 }
 
 function calcHeatIndex(t, rh) {
-  // Simplified Rothfusz regression
   if (t < 27) return t;
   const c1 = -8.784, c2 = 1.611, c3 = 2.338, c4 = -0.146,
         c5 = -0.0126, c6 = -0.0164, c7 = 0.00221, c8 = 0.000725, c9 = -0.00000304;
   return c1 + c2*t + c3*rh + c4*t*rh + c5*t*t + c6*rh*rh + c7*t*t*rh + c8*t*rh*rh + c9*t*t*rh*rh;
+}
+
+function calcAbsoluteHumidity(t, rh) {
+  // g/m³
+  return (6.112 * Math.exp((17.67 * t) / (t + 243.5)) * rh * 2.1674) / (273.15 + t);
+}
+
+function calcVPD(t, rh) {
+  // Vapor Pressure Deficit in kPa
+  const svp = 0.6108 * Math.exp((17.27 * t) / (t + 237.3));
+  return svp * (1 - rh / 100);
 }
 
 function getComfortLevel(t, rh) {
@@ -446,22 +630,89 @@ function getComfortLevel(t, rh) {
   if (rh >= 30 && rh <= 70 && t >= 18 && t <= 28) return { label: 'Good', class: 'success' };
   if (rh < 30) return { label: 'Too Dry', class: 'warning' };
   if (rh > 70) return { label: 'Too Humid', class: 'warning' };
+  if (t > 35) return { label: 'Too Hot', class: 'danger' };
+  if (t < 15) return { label: 'Too Cold', class: 'danger' };
   return { label: 'Fair', class: 'info' };
+}
+
+let comfortDetailMode = 0;
+function cycleComfortDetail() {
+  comfortDetailMode = (comfortDetailMode + 1) % 3;
+  updateUI();
+}
+
+// ============================================
+// Trend calculation
+// ============================================
+function updateTrend(el, history, currentVal) {
+  history.push(currentVal);
+  if (history.length > 10) history.shift();
+  if (history.length < 3) { el.textContent = '--'; return; }
+
+  const recent = history.slice(-3);
+  const older = history.slice(0, 3);
+  const avgRecent = recent.reduce((a, b) => a + b, 0) / recent.length;
+  const avgOlder = older.reduce((a, b) => a + b, 0) / older.length;
+  const diff = avgRecent - avgOlder;
+
+  el.className = 'gauge-trend';
+  if (Math.abs(diff) < 0.3) {
+    el.textContent = '→ stable';
+    el.classList.add('stable');
+  } else if (diff > 0) {
+    el.textContent = '↑ +' + diff.toFixed(1);
+    el.classList.add('up');
+  } else {
+    el.textContent = '↓ ' + diff.toFixed(1);
+    el.classList.add('down');
+  }
 }
 
 // ============================================
 // UI Updates
 // ============================================
 function updateState(data) {
+  const prevAtomiserOn = state.atomiserOn;
   state = { ...state, ...data };
+
+  // Track atomiser runtime
+  if (state.atomiserOn && !prevAtomiserOn) {
+    atomiserStartTime = Date.now();
+    if (!runtimeInterval) {
+      runtimeInterval = setInterval(updateRuntime, 1000);
+    }
+  } else if (!state.atomiserOn && prevAtomiserOn) {
+    atomiserStartTime = null;
+    if (runtimeInterval) { clearInterval(runtimeInterval); runtimeInterval = null; }
+  }
+
   updateUI();
 }
 
+function updateRuntime() {
+  const el = document.getElementById('runtimeCounter');
+  if (atomiserStartTime) {
+    const secs = Math.floor((Date.now() - atomiserStartTime) / 1000);
+    el.textContent = `Runtime: ${formatUptime(secs)}`;
+  } else {
+    el.textContent = 'Runtime: --';
+  }
+}
+
 function updateMinMax() {
-  document.getElementById('tempMin').textContent = tempMin === Infinity ? '--' : tempMin.toFixed(1) + '°';
-  document.getElementById('tempMax').textContent = tempMax === -Infinity ? '--' : tempMax.toFixed(1) + '°';
+  const dispTempMin = tempMin === Infinity ? '--' : toDisplayTemp(tempMin).toFixed(1) + '°';
+  const dispTempMax = tempMax === -Infinity ? '--' : toDisplayTemp(tempMax).toFixed(1) + '°';
+  document.getElementById('tempMin').textContent = dispTempMin;
+  document.getElementById('tempMax').textContent = dispTempMax;
   document.getElementById('humMin').textContent = humMin === Infinity ? '--' : humMin.toFixed(1) + '%';
   document.getElementById('humMax').textContent = humMax === -Infinity ? '--' : humMax.toFixed(1) + '%';
+}
+
+function resetMinMax() {
+  tempMin = Infinity; tempMax = -Infinity;
+  humMin = Infinity; humMax = -Infinity;
+  updateMinMax();
+  showToast('Min/Max values reset', 'info');
 }
 
 function updateUI() {
@@ -478,10 +729,15 @@ function updateUI() {
 
   // Gauges
   if (!sensorError) {
-    tempGauge.setValue(temperature);
+    const dispTemp = toDisplayTemp(temperature);
+    tempGauge.setValue(tempUnit === 'C' ? temperature : Math.min(dispTemp, 120));
     humGauge.setValue(humidity);
-    document.getElementById('tempValue').textContent = temperature.toFixed(1);
+    document.getElementById('tempValue').textContent = dispTemp.toFixed(1);
     document.getElementById('humValue').textContent = humidity.toFixed(1);
+
+    // Trends
+    updateTrend(document.getElementById('tempTrend'), tempHistory, temperature);
+    updateTrend(document.getElementById('humTrend'), humHistory, humidity);
 
     // Track min/max
     if (connected && temperature > 0) {
@@ -496,19 +752,26 @@ function updateUI() {
     const dp = calcDewPoint(temperature, humidity);
     const hi = calcHeatIndex(temperature, humidity);
     const comfort = getComfortLevel(temperature, humidity);
+    const absHum = calcAbsoluteHumidity(temperature, humidity);
+    const vpd = calcVPD(temperature, humidity);
 
-    document.getElementById('dewPoint').textContent = dp.toFixed(1) + '°C';
-    document.getElementById('heatIndex').textContent = hi.toFixed(1) + '°C';
-    document.getElementById('comfortLevel').textContent = comfort.label;
+    document.getElementById('dewPoint').textContent = toDisplayTemp(dp).toFixed(1) + tempUnitLabel();
+    document.getElementById('heatIndex').textContent = toDisplayTemp(hi).toFixed(1) + tempUnitLabel();
+    document.getElementById('absHumidity').textContent = absHum.toFixed(1) + ' g/m³';
+    document.getElementById('vpd').textContent = vpd.toFixed(2) + ' kPa';
 
-    const comfortIcon = document.getElementById('comfortIcon');
-    comfortIcon.className = 'stat-icon comfort-icon';
-
+    // Comfort level with cycling detail
+    const comfortEl = document.getElementById('comfortLevel');
+    if (comfortDetailMode === 0) comfortEl.textContent = comfort.label;
+    else if (comfortDetailMode === 1) comfortEl.textContent = `DP ${toDisplayTemp(dp).toFixed(0)}°`;
+    else comfortEl.textContent = `HI ${toDisplayTemp(hi).toFixed(0)}°`;
   } else {
     document.getElementById('tempValue').textContent = '--';
     document.getElementById('humValue').textContent = '--';
     document.getElementById('dewPoint').textContent = '--';
     document.getElementById('heatIndex').textContent = '--';
+    document.getElementById('absHumidity').textContent = '--';
+    document.getElementById('vpd').textContent = '--';
     document.getElementById('comfortLevel').textContent = '--';
   }
 
@@ -527,6 +790,10 @@ function updateUI() {
   powerStatus.textContent = atomiserOn ? 'ON' : 'OFF';
   powerSubtext.textContent = atomiserOn ? 'Tap to deactivate' : 'Tap to activate';
 
+  if (!atomiserOn) {
+    document.getElementById('runtimeCounter').textContent = 'Runtime: --';
+  }
+
   // Auto mode
   document.getElementById('autoModeToggle').checked = autoMode;
   document.getElementById('autoStatusText').textContent = autoMode ? 'Active — monitoring humidity' : 'Disabled';
@@ -541,6 +808,21 @@ function updateUI() {
 
   // IP display
   if (ip) document.getElementById('currentIpDisplay').textContent = ip;
+}
+
+// ============================================
+// Event Filtering
+// ============================================
+function filterEvents() {
+  const filter = document.getElementById('eventFilter').value;
+  const filtered = filter === 'all' ? allEvents : allEvents.filter(e => e.type === filter);
+  renderEvents(filtered);
+}
+
+function clearEvents() {
+  allEvents = [];
+  renderEvents([]);
+  showToast('Events cleared', 'info');
 }
 
 function renderEvents(events) {
@@ -561,7 +843,7 @@ function renderEvents(events) {
     return `
       <div class="event-item">
         <div class="event-left">
-          <span class="event-type ${e.type}">${e.type}</span>
+          <span class="event-type ${escapeHtml(e.type)}">${escapeHtml(e.type)}</span>
           <span class="event-msg">${escapeHtml(e.message)}</span>
         </div>
         <span class="event-time">${time}</span>
@@ -570,6 +852,142 @@ function renderEvents(events) {
   }).join('');
 }
 
+// ============================================
+// Export Data
+// ============================================
+function exportData(format) {
+  if (format === 'json') {
+    const data = {
+      exported: new Date().toISOString(),
+      readings: chart ? {
+        temperature: chart.data.temperature,
+        humidity: chart.data.humidity,
+        timestamps: chart.data.timestamps
+      } : {},
+      events: allEvents,
+      state: state
+    };
+    downloadFile('atomiser-data.json', JSON.stringify(data, null, 2), 'application/json');
+  } else if (format === 'csv') {
+    let csv = 'Timestamp,Temperature (°C),Humidity (%)\n';
+    if (chart && chart.data.timestamps.length > 0) {
+      for (let i = 0; i < chart.data.timestamps.length; i++) {
+        csv += `${chart.data.timestamps[i]},${chart.data.temperature[i]},${chart.data.humidity[i]}\n`;
+      }
+    }
+    downloadFile('atomiser-readings.csv', csv, 'text/csv');
+  }
+  closeModal();
+  showToast(`Data exported as ${format.toUpperCase()}`, 'success');
+}
+
+function downloadFile(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ============================================
+// Schedules
+// ============================================
+function initDayPicker() {
+  document.querySelectorAll('.day-btn').forEach(btn => {
+    btn.addEventListener('click', () => btn.classList.toggle('active'));
+  });
+}
+
+function addSchedule() {
+  const start = document.getElementById('schedStart').value;
+  const end = document.getElementById('schedEnd').value;
+  const days = [];
+  document.querySelectorAll('.day-btn.active').forEach(btn => {
+    days.push(parseInt(btn.dataset.day));
+  });
+
+  if (!start || !end) {
+    showToast('Please set start and end times', 'error');
+    return;
+  }
+
+  schedules.push({ start, end, days, enabled: true });
+  localStorage.setItem('atomiser_schedules', JSON.stringify(schedules));
+  renderSchedules();
+  showToast('Schedule added', 'success');
+}
+
+function removeSchedule(idx) {
+  schedules.splice(idx, 1);
+  localStorage.setItem('atomiser_schedules', JSON.stringify(schedules));
+  renderSchedules();
+  showToast('Schedule removed', 'info');
+}
+
+function renderSchedules() {
+  const list = document.getElementById('scheduleList');
+  if (schedules.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:0.85rem;padding:16px;">No schedules set</div>';
+    return;
+  }
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  list.innerHTML = schedules.map((s, i) => `
+    <div class="schedule-item">
+      <div>
+        <div class="sched-time">${escapeHtml(s.start)} - ${escapeHtml(s.end)}</div>
+        <div class="sched-days">${s.days.map(d => dayNames[d]).join(', ')}</div>
+      </div>
+      <button class="sched-delete" onclick="removeSchedule(${i})">&times;</button>
+    </div>
+  `).join('');
+}
+
+function checkSchedules() {
+  const now = new Date();
+  const day = now.getDay();
+  const time = now.toTimeString().slice(0, 5);
+
+  for (const sched of schedules) {
+    if (!sched.enabled || !sched.days.includes(day)) continue;
+    if (time === sched.start && !state.atomiserOn) {
+      toggleAtomiser();
+      showToast('Schedule activated atomiser', 'info');
+    }
+    if (time === sched.end && state.atomiserOn) {
+      toggleAtomiser();
+      showToast('Schedule deactivated atomiser', 'info');
+    }
+  }
+}
+
+// ============================================
+// Modals
+// ============================================
+function openModal(id) {
+  document.getElementById('fullscreenOverlay').classList.add('visible');
+  document.getElementById(id).classList.add('visible');
+}
+
+function closeModal() {
+  document.getElementById('fullscreenOverlay').classList.remove('visible');
+  document.querySelectorAll('.modal').forEach(m => m.classList.remove('visible'));
+}
+
+// ============================================
+// Reading Interval
+// ============================================
+function changeInterval() {
+  const val = document.getElementById('intervalSelect').value;
+  const labels = { '1000': '1 second', '2000': '2 seconds', '5000': '5 seconds', '10000': '10 seconds', '30000': '30 seconds' };
+  document.getElementById('currentInterval').textContent = labels[val] || val + 'ms';
+  showToast(`Reading interval set to ${labels[val]}`, 'info');
+}
+
+// ============================================
+// Utilities
+// ============================================
 function formatUptime(seconds) {
   if (!seconds || seconds < 0) return '--';
   const d = Math.floor(seconds / 86400);
@@ -583,6 +1001,7 @@ function formatUptime(seconds) {
 }
 
 function escapeHtml(str) {
+  if (typeof str !== 'string') return '';
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;

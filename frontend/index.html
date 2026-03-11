@@ -14,6 +14,70 @@
   <!-- Background animated particles -->
   <div class="bg-particles" id="bgParticles"></div>
 
+  <!-- Fullscreen overlay -->
+  <div class="fullscreen-overlay" id="fullscreenOverlay" onclick="closeModal()"></div>
+
+  <!-- Data Export Modal -->
+  <div class="modal" id="exportModal">
+    <div class="modal-header">
+      <h3>Export Data</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">Download sensor readings and event logs in your preferred format.</p>
+      <div class="export-options">
+        <button class="export-btn" onclick="exportData('csv')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span>CSV Spreadsheet</span>
+          <small>Compatible with Excel, Google Sheets</small>
+        </button>
+        <button class="export-btn" onclick="exportData('json')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span>JSON Data</span>
+          <small>For developers & integrations</small>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Schedule Modal -->
+  <div class="modal" id="scheduleModal">
+    <div class="modal-header">
+      <h3>Schedules</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">Set daily schedules to automatically control the atomiser.</p>
+      <div class="schedule-list" id="scheduleList"></div>
+      <div class="schedule-form">
+        <div class="schedule-row">
+          <label>Start Time</label>
+          <input type="time" id="schedStart" value="08:00">
+        </div>
+        <div class="schedule-row">
+          <label>End Time</label>
+          <input type="time" id="schedEnd" value="20:00">
+        </div>
+        <div class="schedule-row">
+          <label>Days</label>
+          <div class="day-picker" id="dayPicker">
+            <button class="day-btn active" data-day="0">S</button>
+            <button class="day-btn active" data-day="1">M</button>
+            <button class="day-btn active" data-day="2">T</button>
+            <button class="day-btn active" data-day="3">W</button>
+            <button class="day-btn active" data-day="4">T</button>
+            <button class="day-btn active" data-day="5">F</button>
+            <button class="day-btn active" data-day="6">S</button>
+          </div>
+        </div>
+        <button class="primary-btn full-width" onclick="addSchedule()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Schedule
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="app">
     <!-- Header -->
     <header class="header">
@@ -33,6 +97,12 @@
       </div>
       <div class="header-right">
         <div class="live-clock" id="liveClock"></div>
+        <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme">
+          <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </button>
+        <button class="icon-btn" onclick="toggleFullscreen()" title="Fullscreen">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        </button>
         <div class="connection-badge" id="connectionBadge">
           <span class="dot"></span>
           <span class="label">Disconnected</span>
@@ -49,9 +119,30 @@
       <span id="alertText">DHT11 sensor read error</span>
     </div>
 
+    <!-- Quick Actions Bar -->
+    <section class="quick-actions">
+      <button class="action-chip" onclick="openModal('scheduleModal')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Schedules
+      </button>
+      <button class="action-chip" onclick="openModal('exportModal')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export Data
+      </button>
+      <button class="action-chip" onclick="resetMinMax()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+        Reset Min/Max
+      </button>
+      <button class="action-chip" id="alertSoundBtn" onclick="toggleAlertSound()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        Alerts: On
+      </button>
+    </section>
+
     <!-- Gauge Cards -->
     <section class="gauge-section">
-      <div class="gauge-card">
+      <div class="gauge-card" id="tempCard">
+        <div class="gauge-trend" id="tempTrend" title="Trend">--</div>
         <canvas id="tempGauge" width="200" height="200"></canvas>
         <div class="gauge-info">
           <span class="gauge-value temp-color" id="tempValue">--</span>
@@ -62,8 +153,10 @@
           <span>Min: <b id="tempMin">--</b></span>
           <span>Max: <b id="tempMax">--</b></span>
         </div>
+        <div class="gauge-sparkline"><canvas id="tempSparkline" height="30"></canvas></div>
       </div>
-      <div class="gauge-card">
+      <div class="gauge-card" id="humCard">
+        <div class="gauge-trend" id="humTrend" title="Trend">--</div>
         <canvas id="humGauge" width="200" height="200"></canvas>
         <div class="gauge-info">
           <span class="gauge-value hum-color" id="humValue">--</span>
@@ -74,6 +167,7 @@
           <span>Min: <b id="humMin">--</b></span>
           <span>Max: <b id="humMax">--</b></span>
         </div>
+        <div class="gauge-sparkline"><canvas id="humSparkline" height="30"></canvas></div>
       </div>
       <div class="gauge-card stat-card">
         <div class="stat-row">
@@ -85,7 +179,7 @@
             </div>
             <div><div class="stat-label">Uptime</div><div class="stat-value" id="uptime">--</div></div>
           </div>
-          <div class="stat-item">
+          <div class="stat-item clickable" onclick="cycleComfortDetail()">
             <div class="stat-icon comfort-icon" id="comfortIcon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
@@ -110,6 +204,24 @@
               </svg>
             </div>
             <div><div class="stat-label">Heat Index</div><div class="stat-value" id="heatIndex">--</div></div>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-item">
+            <div class="stat-icon abs-hum-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2v6m0 12v2"/><circle cx="12" cy="14" r="6"/><path d="M6 8l1.5 1.5M18 8l-1.5 1.5"/>
+              </svg>
+            </div>
+            <div><div class="stat-label">Abs. Humidity</div><div class="stat-value" id="absHumidity">--</div></div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-icon vpd-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M8 12h8"/><path d="M12 8v8"/>
+              </svg>
+            </div>
+            <div><div class="stat-label">VPD</div><div class="stat-value" id="vpd">--</div></div>
           </div>
         </div>
       </div>
@@ -139,6 +251,7 @@
         </div>
         <div class="power-status" id="powerStatus">OFF</div>
         <div class="power-subtext" id="powerSubtext">Tap to activate</div>
+        <div class="runtime-counter" id="runtimeCounter">Runtime: --</div>
       </div>
 
       <div class="panel glass auto-panel">
@@ -165,14 +278,30 @@
           <div class="threshold-slider-wrap">
             <input type="range" id="thresholdSlider" min="20" max="95" value="60"
                    oninput="updateThresholdLabel()" onchange="setThreshold()">
-            <div class="threshold-track-fill" id="thresholdFill"></div>
           </div>
-          <div class="range-labels"><span>20%</span><span>Dry</span><span>Comfortable</span><span>Humid</span><span>95%</span></div>
+          <div class="threshold-zones">
+            <div class="zone zone-dry">Dry</div>
+            <div class="zone zone-comfort">Comfort</div>
+            <div class="zone zone-humid">Humid</div>
+          </div>
+          <div class="range-labels"><span>20%</span><span>95%</span></div>
+        </div>
+
+        <div class="hysteresis-section">
+          <div class="threshold-header">
+            <span>Hysteresis Band</span>
+            <span class="threshold-badge small" id="hystBadge">&plusmn;5%</span>
+          </div>
+          <div class="threshold-slider-wrap">
+            <input type="range" id="hystSlider" min="1" max="15" value="5"
+                   oninput="updateHystLabel()">
+          </div>
+          <div class="range-labels"><span>&plusmn;1%</span><span>&plusmn;15%</span></div>
         </div>
 
         <div class="auto-info-card">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-          <span>Atomiser activates below threshold and stops when humidity is reached.</span>
+          <span>Atomiser activates below threshold and stops when humidity is reached. Hysteresis prevents rapid cycling.</span>
         </div>
       </div>
     </section>
@@ -185,11 +314,30 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             Sensor History
           </h2>
-          <div class="chart-controls">
-            <button class="chip active" data-range="1h" onclick="setChartRange('1h', this)">1H</button>
-            <button class="chip" data-range="6h" onclick="setChartRange('6h', this)">6H</button>
-            <button class="chip" data-range="24h" onclick="setChartRange('24h', this)">24H</button>
+          <div class="chart-toolbar">
+            <div class="chart-controls">
+              <button class="chip active" data-range="1h" onclick="setChartRange('1h', this)">1H</button>
+              <button class="chip" data-range="6h" onclick="setChartRange('6h', this)">6H</button>
+              <button class="chip" data-range="24h" onclick="setChartRange('24h', this)">24H</button>
+            </div>
+            <div class="chart-toggles">
+              <button class="toggle-btn active" id="toggleTemp" onclick="toggleChartLine('temp', this)" title="Toggle temperature">
+                <span class="legend-dot temp"></span> T
+              </button>
+              <button class="toggle-btn active" id="toggleHum" onclick="toggleChartLine('hum', this)" title="Toggle humidity">
+                <span class="legend-dot hum"></span> H
+              </button>
+              <button class="toggle-btn active" id="toggleThreshold" onclick="toggleChartLine('threshold', this)" title="Toggle threshold">
+                <span class="legend-dot threshold"></span> Th
+              </button>
+            </div>
           </div>
+        </div>
+        <div class="chart-stats" id="chartStats">
+          <div class="chart-stat"><span class="cs-label">Avg Temp</span><span class="cs-value" id="csAvgTemp">--</span></div>
+          <div class="chart-stat"><span class="cs-label">Avg Hum</span><span class="cs-value" id="csAvgHum">--</span></div>
+          <div class="chart-stat"><span class="cs-label">Readings</span><span class="cs-value" id="csCount">0</span></div>
+          <div class="chart-stat"><span class="cs-label">Duration</span><span class="cs-value" id="csDuration">--</span></div>
         </div>
         <div class="chart-wrap">
           <canvas id="chart"></canvas>
@@ -211,9 +359,21 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             Event Log
           </h2>
-          <button class="ghost-btn" onclick="fetchEvents()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-          </button>
+          <div class="events-actions">
+            <select id="eventFilter" onchange="filterEvents()" class="filter-select">
+              <option value="all">All Events</option>
+              <option value="manual">Manual</option>
+              <option value="auto">Auto</option>
+              <option value="config">Config</option>
+              <option value="connection">Connection</option>
+            </select>
+            <button class="ghost-btn" onclick="clearEvents()" title="Clear events">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </button>
+            <button class="ghost-btn" onclick="fetchEvents()" title="Refresh events">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            </button>
+          </div>
         </div>
         <div class="events-list" id="eventsList">
           <div class="event-empty">
@@ -223,7 +383,7 @@
         </div>
       </div>
 
-      <div class="panel glass">
+      <div class="panel glass settings-panel">
         <h2>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
           Settings
@@ -240,11 +400,61 @@
             </button>
           </div>
         </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Reading Interval</div>
+            <div class="setting-current" id="currentInterval">1 second</div>
+          </div>
+          <div class="input-group">
+            <select id="intervalSelect" onchange="changeInterval()">
+              <option value="1000">1s</option>
+              <option value="2000">2s</option>
+              <option value="5000" selected>5s</option>
+              <option value="10000">10s</option>
+              <option value="30000">30s</option>
+            </select>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Temperature Unit</div>
+            <div class="setting-current" id="currentTempUnit">Celsius (°C)</div>
+          </div>
+          <div class="unit-toggle">
+            <button class="unit-btn active" id="unitC" onclick="setTempUnit('C')">°C</button>
+            <button class="unit-btn" id="unitF" onclick="setTempUnit('F')">°F</button>
+          </div>
+        </div>
+        <div class="setting-divider"></div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Danger Thresholds</div>
+            <div class="setting-current">Alert when exceeded</div>
+          </div>
+        </div>
+        <div class="threshold-inputs">
+          <div class="threshold-input-group">
+            <label>High Temp</label>
+            <input type="number" id="highTempAlert" value="40" min="0" max="60" onchange="saveAlertThresholds()">
+            <span class="unit-label">°C</span>
+          </div>
+          <div class="threshold-input-group">
+            <label>Low Humidity</label>
+            <input type="number" id="lowHumAlert" value="25" min="0" max="100" onchange="saveAlertThresholds()">
+            <span class="unit-label">%</span>
+          </div>
+          <div class="threshold-input-group">
+            <label>High Humidity</label>
+            <input type="number" id="highHumAlert" value="85" min="0" max="100" onchange="saveAlertThresholds()">
+            <span class="unit-label">%</span>
+          </div>
+        </div>
       </div>
     </section>
 
     <footer class="footer">
       <span>Atomiser Dashboard &mdash; ESP32 + DHT11 + MOSFET</span>
+      <span class="footer-version">v2.0</span>
     </footer>
   </div>
 

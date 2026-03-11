@@ -1,6 +1,6 @@
 // ============================================
-// Enhanced Sensor Chart with Tooltips
-// Smooth curves, crosshair, threshold line
+// Enhanced Sensor Chart v2.0
+// Smooth curves, crosshair, threshold, toggles
 // ============================================
 
 class SensorChart {
@@ -14,6 +14,9 @@ class SensorChart {
     this.hoverIndex = -1;
     this.animProgress = 0;
     this.animFrame = null;
+    this.showTemp = true;
+    this.showHum = true;
+    this.showThreshold = true;
 
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -74,6 +77,13 @@ class SensorChart {
     this.draw();
   }
 
+  toggleLine(line) {
+    if (line === 'temp') this.showTemp = !this.showTemp;
+    if (line === 'hum') this.showHum = !this.showHum;
+    if (line === 'threshold') this.showThreshold = !this.showThreshold;
+    this.draw();
+  }
+
   animateIn() {
     this.animProgress = 0;
     if (this.animFrame) cancelAnimationFrame(this.animFrame);
@@ -110,14 +120,15 @@ class SensorChart {
       const time = this.data.labels[idx];
 
       this.tooltip.innerHTML = `
-        <div style="font-weight:700; margin-bottom:6px; color:#f1f5f9;">${time}</div>
+        <div style="font-weight:700; margin-bottom:6px; color:var(--text);">${time}</div>
         <div style="color:#fb923c;">🌡 ${temp.toFixed(1)}°C</div>
         <div style="color:#38bdf8;">💧 ${hum.toFixed(1)}%</div>
+        <div style="color:#8b5cf6; margin-top:4px; font-size:0.72rem;">Threshold: ${this.threshold}%</div>
       `;
       this.tooltip.classList.add('visible');
 
       let tx = p.left + idx * xStep + 12;
-      let ty = my - 60;
+      let ty = my - 70;
       if (tx + 160 > this.width) tx = tx - 170;
       if (ty < 0) ty = 10;
       this.tooltip.style.left = tx + 'px';
@@ -129,6 +140,21 @@ class SensorChart {
     this.hoverIndex = -1;
     this.tooltip.classList.remove('visible');
     this.draw();
+  }
+
+  getStats() {
+    const len = this.data.temperature.length;
+    if (len === 0) return null;
+    const avgT = this.data.temperature.reduce((a, b) => a + b, 0) / len;
+    const avgH = this.data.humidity.reduce((a, b) => a + b, 0) / len;
+    let duration = '--';
+    if (len >= 2) {
+      const ms = new Date(this.data.timestamps[len - 1]) - new Date(this.data.timestamps[0]);
+      const mins = Math.round(ms / 60000);
+      if (mins < 60) duration = mins + 'm';
+      else duration = Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+    }
+    return { avgTemp: avgT.toFixed(1), avgHum: avgH.toFixed(1), count: len, duration };
   }
 
   draw() {
@@ -150,7 +176,12 @@ class SensorChart {
       return;
     }
 
-    const allVals = [...this.data.temperature, ...this.data.humidity, this.threshold];
+    const allVals = [];
+    if (this.showTemp) allVals.push(...this.data.temperature);
+    if (this.showHum) allVals.push(...this.data.humidity);
+    if (this.showThreshold) allVals.push(this.threshold);
+    if (allVals.length === 0) allVals.push(0, 100);
+
     let minVal = Math.floor(Math.min(...allVals) - 5);
     let maxVal = Math.ceil(Math.max(...allVals) + 5);
     if (maxVal - minVal < 10) { minVal -= 5; maxVal += 5; }
@@ -192,25 +223,26 @@ class SensorChart {
     }
 
     // Threshold line
-    const thY = toY(this.threshold);
-    ctx.beginPath();
-    ctx.setLineDash([8, 6]);
-    ctx.strokeStyle = 'rgba(139, 92, 246, 0.5)';
-    ctx.lineWidth = 1.5;
-    ctx.moveTo(p.left, thY);
-    ctx.lineTo(w - p.right, thY);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(139, 92, 246, 0.7)';
-    ctx.font = '600 10px Inter, system-ui';
-    ctx.textAlign = 'left';
-    ctx.fillText(`Threshold ${this.threshold}%`, p.left + 4, thY - 6);
+    if (this.showThreshold) {
+      const thY = toY(this.threshold);
+      ctx.beginPath();
+      ctx.setLineDash([8, 6]);
+      ctx.strokeStyle = 'rgba(139, 92, 246, 0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.moveTo(p.left, thY);
+      ctx.lineTo(w - p.right, thY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(139, 92, 246, 0.7)';
+      ctx.font = '600 10px Inter, system-ui';
+      ctx.textAlign = 'left';
+      ctx.fillText(`Threshold ${this.threshold}%`, p.left + 4, thY - 6);
+    }
 
     // Draw smooth line with gradient
     const drawSmoothLine = (values, color, glowColor) => {
       if (visibleLen < 2) return;
 
-      // Line
       ctx.beginPath();
       ctx.strokeStyle = color;
       ctx.lineWidth = 2.5;
@@ -238,8 +270,8 @@ class SensorChart {
       ctx.fill();
     };
 
-    drawSmoothLine(this.data.temperature, '#fb923c', 'rgba(251, 146, 60, 0.12)');
-    drawSmoothLine(this.data.humidity, '#38bdf8', 'rgba(56, 189, 248, 0.12)');
+    if (this.showTemp) drawSmoothLine(this.data.temperature, '#fb923c', 'rgba(251, 146, 60, 0.12)');
+    if (this.showHum) drawSmoothLine(this.data.humidity, '#38bdf8', 'rgba(56, 189, 248, 0.12)');
 
     // Crosshair on hover
     if (this.hoverIndex >= 0 && this.hoverIndex < len) {
@@ -252,7 +284,6 @@ class SensorChart {
       ctx.lineTo(hx, p.top + chartH);
       ctx.stroke();
 
-      // Dots
       const drawDot = (val, color) => {
         const y = toY(val);
         ctx.beginPath();
@@ -265,8 +296,82 @@ class SensorChart {
         ctx.fill();
       };
 
-      drawDot(this.data.temperature[this.hoverIndex], '#fb923c');
-      drawDot(this.data.humidity[this.hoverIndex], '#38bdf8');
+      if (this.showTemp) drawDot(this.data.temperature[this.hoverIndex], '#fb923c');
+      if (this.showHum) drawDot(this.data.humidity[this.hoverIndex], '#38bdf8');
     }
+  }
+}
+
+// ============================================
+// Sparkline Chart (mini chart inside gauge card)
+// ============================================
+class SparklineChart {
+  constructor(canvasId, color) {
+    this.canvas = document.getElementById(canvasId);
+    if (!this.canvas) return;
+    this.ctx = this.canvas.getContext('2d');
+    this.color = color;
+    this.data = [];
+    this.maxPoints = 30;
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+  }
+
+  resize() {
+    if (!this.canvas) return;
+    const parent = this.canvas.parentElement;
+    const rect = parent.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    this.width = rect.width;
+    this.height = 30;
+    this.canvas.width = this.width * dpr;
+    this.canvas.height = this.height * dpr;
+    this.canvas.style.width = this.width + 'px';
+    this.canvas.style.height = this.height + 'px';
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.draw();
+  }
+
+  addPoint(val) {
+    this.data.push(val);
+    if (this.data.length > this.maxPoints) this.data.shift();
+    this.draw();
+  }
+
+  draw() {
+    if (!this.canvas || this.data.length < 2) return;
+    const ctx = this.ctx;
+    const w = this.width;
+    const h = this.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const min = Math.min(...this.data) - 1;
+    const max = Math.max(...this.data) + 1;
+    const range = max - min || 1;
+    const step = w / (this.data.length - 1);
+
+    ctx.beginPath();
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+
+    this.data.forEach((v, i) => {
+      const x = i * step;
+      const y = h - ((v - min) / range) * (h - 4) - 2;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Fill
+    const lastX = (this.data.length - 1) * step;
+    ctx.lineTo(lastX, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, this.color.replace(')', ', 0.2)').replace('rgb', 'rgba'));
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fill();
   }
 }

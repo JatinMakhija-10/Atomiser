@@ -1,6 +1,6 @@
 # Atomiser - Smart Humidity Controller
 
-ESP32-based atomiser/humidifier controller with real-time web dashboard.
+ESP32-based atomiser/humidifier controller with a real-time web dashboard featuring radial gauges, sparkline charts, schedule automation, data export, light/dark themes, and derived climate metrics.
 
 ## Architecture
 
@@ -8,7 +8,7 @@ ESP32-based atomiser/humidifier controller with real-time web dashboard.
 ┌─────────────────┐       WebSocket (81)       ┌─────────────────┐       WebSocket (3001)       ┌──────────────┐
 │     ESP32        │ ◄──────────────────────►   │   Node.js       │ ◄──────────────────────►     │   Frontend    │
 │  DHT11 + MOSFET  │       REST API (80)        │   Backend       │       REST API (3000)        │   Dashboard   │
-│  + Atomiser      │ ◄──────────────────────►   │   + SQLite DB   │ ◄──────────────────────►     │   (Browser)   │
+│  + Atomiser      │ ◄──────────────────────►   │   + JSON Store  │ ◄──────────────────────►     │   (Browser)   │
 └─────────────────┘                             └─────────────────┘                              └──────────────┘
 ```
 
@@ -24,7 +24,20 @@ ESP32-based atomiser/humidifier controller with real-time web dashboard.
 
 ## Quick Start
 
-### 1. Flash ESP32 Firmware
+### Prerequisites
+
+- **Node.js** (v16 or higher)
+- **PlatformIO** (for flashing ESP32 firmware)
+- **ESP32 dev board** + DHT11 sensor + N-channel MOSFET + atomiser module
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/JatinMakhija-10/Atomiser.git
+cd Atomiser
+```
+
+### 2. Flash ESP32 Firmware
 
 ```bash
 cd firmware
@@ -39,7 +52,7 @@ pio run --target upload
 pio device monitor
 ```
 
-### 2. Start Backend Server
+### 3. Start Backend Server
 
 ```bash
 cd backend
@@ -57,9 +70,9 @@ npm start
 ESP32_IP=192.168.1.100 npm start
 ```
 
-### 3. Open Dashboard
+### 4. Open Dashboard
 
-Navigate to `http://localhost:3000` in your browser.
+Navigate to `http://localhost:3000` in your browser. The backend serves the frontend automatically.
 
 ## API Reference
 
@@ -84,13 +97,22 @@ Navigate to `http://localhost:3000` in your browser.
 
 ## Features
 
-- **Real-time monitoring** - Temperature & humidity via WebSocket
+- **Real-time monitoring** - Temperature & humidity via WebSocket with radial gauges
+- **Sparkline charts** - Mini trend charts in each gauge card
 - **Manual control** - Turn atomiser on/off from dashboard
-- **Auto mode** - Automatic humidity control with configurable threshold
-- **History charts** - 1H / 6H / 24H sensor data graphs
-- **Event logging** - Track all actions and state changes
+- **Auto mode** - Automatic humidity control with configurable threshold + hysteresis
+- **History charts** - 1H / 6H / 24H sensor data with toggleable lines & tooltip
+- **Schedule automation** - Set daily on/off schedules (persisted in localStorage)
+- **Data export** - Export readings as CSV or JSON
+- **Light/Dark themes** - Toggle with Ctrl+T or the theme button
+- **Derived metrics** - Dew point, heat index, absolute humidity, VPD, comfort level
+- **Alert thresholds** - Custom temperature & humidity danger limits
+- **Temperature units** - Switch between °C and °F
+- **Min/Max tracking** - Track extremes with one-click reset
+- **Event logging** - Filterable event log with type badges
+- **Fullscreen mode** - Immersive dashboard view
 - **Responsive** - Works on mobile & desktop
-- **No external CDN** - Zero dependencies in frontend, custom canvas charts
+- **No external CDN** - Zero frontend dependencies, custom canvas charts
 
 ## File Structure
 
@@ -102,13 +124,15 @@ Atomiser/
 │       ├── config.h            # WiFi, pin, and default settings
 │       └── main.cpp            # ESP32 firmware
 ├── backend/
-│   ├── package.json
-│   └── server.js               # Express + WebSocket + SQLite
+│   ├── package.json            # Node.js dependencies
+│   ├── package-lock.json       # Locked dependency versions
+│   ├── server.js               # Express + WebSocket + JSON store
+│   └── data/                   # Runtime JSON data (auto-created)
 ├── frontend/
-│   ├── index.html              # Dashboard HTML
-│   ├── style.css               # Dark theme styles
-│   ├── app.js                  # Dashboard logic & API calls
-│   └── chart.js                # Custom canvas chart
+│   ├── index.html              # Dashboard HTML (v2.0)
+│   ├── style.css               # Light/dark theme styles
+│   ├── app.js                  # Dashboard logic, gauges, schedules, export
+│   └── chart.js                # Custom canvas chart + sparkline class
 └── README.md
 ```
 
@@ -119,3 +143,12 @@ Edit `firmware/src/config.h` to set:
 - `DHT_PIN` (default: GPIO 4) - DHT11 data pin
 - `MOSFET_PIN` (default: GPIO 5) - MOSFET gate pin
 - `DEFAULT_HUMIDITY_THRESHOLD` (default: 60%) - Auto mode threshold
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| `npm install` fails | Make sure Node.js v16+ is installed |
+| Can't connect to ESP32 | Check WiFi credentials in `config.h`, ensure ESP32 is on the same network |
+| Dashboard shows "Disconnected" | Set ESP32 IP via the dashboard settings or `ESP32_IP` env variable |
+| Port 3000 in use | `npx kill-port 3000` or change port in `server.js` |
