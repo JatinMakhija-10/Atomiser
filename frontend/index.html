@@ -14,8 +14,22 @@
   <!-- Background animated particles -->
   <div class="bg-particles" id="bgParticles"></div>
 
+  <!-- Animated Mesh Background -->
+  <div class="mesh-bg" id="meshBg"></div>
+
   <!-- Fullscreen overlay -->
   <div class="fullscreen-overlay" id="fullscreenOverlay" onclick="closeModal()"></div>
+
+  <!-- Fullscreen Chart Modal -->
+  <div class="modal chart-modal" id="chartModal">
+    <div class="modal-header">
+      <h3>Sensor History — Expanded</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="chart-fullscreen-wrap">
+      <canvas id="chartFullscreen"></canvas>
+    </div>
+  </div>
 
   <!-- Data Export Modal -->
   <div class="modal" id="exportModal">
@@ -107,6 +121,7 @@
           <span class="dot"></span>
           <span class="label">Disconnected</span>
         </div>
+        <span class="ping-badge" id="pingBadge"><span class="dot"></span>--ms</span>
       </div>
     </header>
 
@@ -140,7 +155,7 @@
     </section>
 
     <!-- Gauge Cards -->
-    <section class="gauge-section">
+    <section class="gauge-section reveal">
       <div class="gauge-card" id="tempCard">
         <div class="gauge-trend" id="tempTrend" title="Trend">--</div>
         <canvas id="tempGauge" width="200" height="200"></canvas>
@@ -228,7 +243,7 @@
     </section>
 
     <!-- Atomiser Control -->
-    <section class="control-section">
+    <section class="control-section reveal">
       <div class="panel glass atomiser-panel">
         <h2>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6m0 12v2m-7-7H3m18 0h-2m-1.5-6.5l-1.4 1.4M7.9 16.1l-1.4 1.4m0-11l1.4 1.4m8.2 8.2l1.4 1.4"/><circle cx="12" cy="14" r="4"/></svg>
@@ -307,7 +322,7 @@
     </section>
 
     <!-- Chart -->
-    <section class="chart-section">
+    <section class="chart-section reveal">
       <div class="panel glass">
         <div class="chart-header">
           <h2>
@@ -320,6 +335,9 @@
               <button class="chip" data-range="6h" onclick="setChartRange('6h', this)">6H</button>
               <button class="chip" data-range="24h" onclick="setChartRange('24h', this)">24H</button>
             </div>
+            <button class="icon-btn" onclick="openFullscreenChart()" title="Expand chart">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+            </button>
             <div class="chart-toggles">
               <button class="toggle-btn active" id="toggleTemp" onclick="toggleChartLine('temp', this)" title="Toggle temperature">
                 <span class="legend-dot temp"></span> T
@@ -352,7 +370,7 @@
     </section>
 
     <!-- Events + Settings -->
-    <section class="bottom-section">
+    <section class="bottom-section reveal">
       <div class="panel glass">
         <div class="events-header">
           <h2>
