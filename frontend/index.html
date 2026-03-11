@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atomiser Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💧</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Toast container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Background animated particles -->
+  <div class="bg-particles" id="bgParticles"></div>
+
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <svg viewBox="0 0 40 40" width="32" height="32" fill="none">
+            <path d="M20 4C20 4 8 18 8 26a12 12 0 0024 0c0-8-12-22-12-22z" fill="url(#dropGrad)" />
+            <defs><linearGradient id="dropGrad" x1="8" y1="4" x2="32" y2="38">
+              <stop offset="0%" stop-color="#38bdf8"/><stop offset="100%" stop-color="#6366f1"/>
+            </linearGradient></defs>
+          </svg>
+        </div>
+        <div>
+          <h1>Atomiser</h1>
+          <p class="subtitle">Smart Humidity Controller</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="live-clock" id="liveClock"></div>
+        <div class="connection-badge" id="connectionBadge">
+          <span class="dot"></span>
+          <span class="label">Disconnected</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sensor Error Banner -->
+    <div class="alert-banner" id="alertBanner">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <span id="alertText">DHT11 sensor read error</span>
+    </div>
+
+    <!-- Gauge Cards -->
+    <section class="gauge-section">
+      <div class="gauge-card">
+        <canvas id="tempGauge" width="200" height="200"></canvas>
+        <div class="gauge-info">
+          <span class="gauge-value temp-color" id="tempValue">--</span>
+          <span class="gauge-unit">°C</span>
+        </div>
+        <div class="gauge-label">Temperature</div>
+        <div class="gauge-minmax">
+          <span>Min: <b id="tempMin">--</b></span>
+          <span>Max: <b id="tempMax">--</b></span>
+        </div>
+      </div>
+      <div class="gauge-card">
+        <canvas id="humGauge" width="200" height="200"></canvas>
+        <div class="gauge-info">
+          <span class="gauge-value hum-color" id="humValue">--</span>
+          <span class="gauge-unit">%</span>
+        </div>
+        <div class="gauge-label">Humidity</div>
+        <div class="gauge-minmax">
+          <span>Min: <b id="humMin">--</b></span>
+          <span>Max: <b id="humMax">--</b></span>
+        </div>
+      </div>
+      <div class="gauge-card stat-card">
+        <div class="stat-row">
+          <div class="stat-item">
+            <div class="stat-icon uptime-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <div><div class="stat-label">Uptime</div><div class="stat-value" id="uptime">--</div></div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-icon comfort-icon" id="comfortIcon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
+              </svg>
+            </div>
+            <div><div class="stat-label">Comfort</div><div class="stat-value" id="comfortLevel">--</div></div>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-item">
+            <div class="stat-icon dew-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2C12 2 6 10 6 14a6 6 0 0012 0c0-4-6-12-6-12z"/>
+              </svg>
+            </div>
+            <div><div class="stat-label">Dew Point</div><div class="stat-value" id="dewPoint">--</div></div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-icon heat-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z"/>
+              </svg>
+            </div>
+            <div><div class="stat-label">Heat Index</div><div class="stat-value" id="heatIndex">--</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Atomiser Control -->
+    <section class="control-section">
+      <div class="panel glass atomiser-panel">
+        <h2>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6m0 12v2m-7-7H3m18 0h-2m-1.5-6.5l-1.4 1.4M7.9 16.1l-1.4 1.4m0-11l1.4 1.4m8.2 8.2l1.4 1.4"/><circle cx="12" cy="14" r="4"/></svg>
+          Atomiser Control
+        </h2>
+        <div class="atomiser-visual" id="atomiserVisual">
+          <div class="mist-ring" id="mistRing">
+            <div class="mist-drop"></div>
+            <div class="mist-drop"></div>
+            <div class="mist-drop"></div>
+            <div class="mist-drop"></div>
+            <div class="mist-drop"></div>
+            <div class="mist-drop"></div>
+            <div class="mist-drop"></div>
+            <div class="mist-drop"></div>
+          </div>
+          <div class="power-button" id="powerBtn" onclick="toggleAtomiser()">
+            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18.36 6.64a9 9 0 11-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+          </div>
+        </div>
+        <div class="power-status" id="powerStatus">OFF</div>
+        <div class="power-subtext" id="powerSubtext">Tap to activate</div>
+      </div>
+
+      <div class="panel glass auto-panel">
+        <h2>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Auto Mode
+        </h2>
+        <div class="auto-toggle-row">
+          <div>
+            <div class="auto-toggle-label">Automatic Control</div>
+            <div class="auto-toggle-desc" id="autoStatusText">Disabled</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="autoModeToggle" onchange="toggleAutoMode()">
+            <span class="slider-track"><span class="slider-thumb"></span></span>
+          </label>
+        </div>
+
+        <div class="threshold-section">
+          <div class="threshold-header">
+            <span>Target Humidity</span>
+            <span class="threshold-badge" id="thresholdBadge">60%</span>
+          </div>
+          <div class="threshold-slider-wrap">
+            <input type="range" id="thresholdSlider" min="20" max="95" value="60"
+                   oninput="updateThresholdLabel()" onchange="setThreshold()">
+            <div class="threshold-track-fill" id="thresholdFill"></div>
+          </div>
+          <div class="range-labels"><span>20%</span><span>Dry</span><span>Comfortable</span><span>Humid</span><span>95%</span></div>
+        </div>
+
+        <div class="auto-info-card">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>Atomiser activates below threshold and stops when humidity is reached.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Chart -->
+    <section class="chart-section">
+      <div class="panel glass">
+        <div class="chart-header">
+          <h2>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Sensor History
+          </h2>
+          <div class="chart-controls">
+            <button class="chip active" data-range="1h" onclick="setChartRange('1h', this)">1H</button>
+            <button class="chip" data-range="6h" onclick="setChartRange('6h', this)">6H</button>
+            <button class="chip" data-range="24h" onclick="setChartRange('24h', this)">24H</button>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chart"></canvas>
+          <div class="chart-tooltip" id="chartTooltip"></div>
+        </div>
+        <div class="chart-legend">
+          <span class="legend-item"><span class="legend-dot temp"></span> Temperature (°C)</span>
+          <span class="legend-item"><span class="legend-dot hum"></span> Humidity (%)</span>
+          <span class="legend-item"><span class="legend-dot threshold"></span> Threshold</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Events + Settings -->
+    <section class="bottom-section">
+      <div class="panel glass">
+        <div class="events-header">
+          <h2>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Event Log
+          </h2>
+          <button class="ghost-btn" onclick="fetchEvents()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+          </button>
+        </div>
+        <div class="events-list" id="eventsList">
+          <div class="event-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span>No events yet</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel glass">
+        <h2>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          Settings
+        </h2>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">ESP32 IP Address</div>
+            <div class="setting-current" id="currentIpDisplay">192.168.1.100</div>
+          </div>
+          <div class="input-group">
+            <input type="text" id="espIpInput" placeholder="e.g. 192.168.1.100" autocomplete="off">
+            <button onclick="updateEspIp()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Atomiser Dashboard &mdash; ESP32 + DHT11 + MOSFET</span>
+    </footer>
+  </div>
+
+  <script src="chart.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
