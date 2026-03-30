@@ -6,13 +6,32 @@
 #define CONFIG_H
 
 // ----- WiFi Credentials -----
-#define WIFI_SSID     "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID     "Jatin"
+#define WIFI_PASSWORD "jatin123"
+
+// ----- WiFi Network (optional static IP) -----
+#define USE_STATIC_IP false
+#define STATIC_IP     {192, 168, 1, 100}
+#define GATEWAY_IP    {192, 168, 1, 1}
+#define SUBNET_MASK   {255, 255, 255, 0}
+#define DNS1_IP       {8, 8, 8, 8}
+
+// ----- WiFi Retry -----
+#define WIFI_MAX_ATTEMPTS       60
+#define WIFI_RETRY_INTERVAL_MS  5000
 
 // ----- Pin Definitions -----
 #define DHT_PIN       4      // DHT11 data pin (GPIO4)
-#define MOSFET_PIN    5      // MOSFET gate pin (GPIO5)
+#define MOSFET_PIN    18     // MOSFET gate pin
+
 #define DHT_TYPE      DHT11  // Sensor type
+
+// --- Sensors ---
+#define WATER_LVL_PIN 36     // Water Level Sensor (Analog) - VP
+#define GAS_SENSOR_PIN 39    // Gas Sensor (MQ Series) - VN
+#define OLED_SDA      21     // OLED I2C SDA
+#define OLED_SCL      22     // OLED I2C SCL
+
 
 // ----- Atomiser Defaults -----
 #define DEFAULT_HUMIDITY_THRESHOLD  60.0  // Auto-off humidity %

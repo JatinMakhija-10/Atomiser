@@ -43,12 +43,15 @@ function saveJson(file, data) {
 let readings = loadJson(READINGS_FILE, []);
 let events = loadJson(EVENTS_FILE, []);
 
-function addReading(temp, hum, atomiserOn, autoMode) {
+function addReading(temp, hum, atomiserOn, autoMode, waterLevelAnalog, gasAnalog, waterHeightCm) {
   readings.push({
     temperature: temp,
     humidity: hum,
     atomiser_on: atomiserOn ? 1 : 0,
     auto_mode: autoMode ? 1 : 0,
+    waterLevelAnalog: waterLevelAnalog || 0,
+    gasAnalog: gasAnalog || 0,
+    waterHeightCm: waterHeightCm || 0,
     created_at: new Date().toISOString(),
   });
   if (readings.length > MAX_READINGS) readings = readings.slice(-MAX_READINGS);
@@ -79,6 +82,13 @@ let latestStatus = {
   uptime: 0,
   ip: ESP32_IP,
   connected: false,
+  waterLevelAnalog: 0,
+  gasAnalog: 0,
+  waterHeightCm: 0,
+  flyingFishA: 0,
+  flyingFishD: 0,
+  waterSafetyD: 0,
+  safetyOverrideOff: false,
 };
 
 // ----- API Routes -----
@@ -259,7 +269,7 @@ function connectToESP32() {
       saveCounter++;
       if (saveCounter >= 30) {
         saveCounter = 0;
-        addReading(status.temperature, status.humidity, status.atomiserOn, status.autoMode);
+        addReading(status.temperature, status.humidity, status.atomiserOn, status.autoMode, status.waterLevelAnalog, status.gasAnalog, status.waterHeightCm);
       }
 
       if (prevState !== status.atomiserOn) {

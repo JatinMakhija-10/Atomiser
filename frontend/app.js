@@ -796,6 +796,30 @@ function updateUI() {
     document.getElementById('comfortLevel').textContent = '--';
   }
 
+  // Update New Sensors
+  if (connected) {
+    document.getElementById('waterDepth').textContent = state.waterHeightCm === -1 ? 'Err' : state.waterHeightCm.toFixed(1) + ' cm';
+    document.getElementById('gasLevel').textContent = state.gasAnalog || 0;
+    document.getElementById('waterLvl').textContent = state.waterLevelAnalog || 0;
+    document.getElementById('flyingFish').textContent = `A:${state.flyingFishA || 0} D:${state.flyingFishD || 0}`;
+    const safeEl = document.getElementById('systemSafety');
+    if (state.safetyOverrideOff) {
+      safeEl.textContent = 'OVERRIDE';
+      safeEl.style.color = '#ef4444'; // Red
+    } else {
+      safeEl.textContent = 'Safe';
+      safeEl.style.color = '#22c55e'; // Green
+    }
+  } else {
+    document.getElementById('waterDepth').textContent = '--';
+    document.getElementById('gasLevel').textContent = '--';
+    document.getElementById('waterLvl').textContent = '--';
+    document.getElementById('flyingFish').textContent = '--';
+    const safeEl = document.getElementById('systemSafety');
+    safeEl.textContent = '--';
+    safeEl.style.color = '';
+  }
+
   // Uptime
   document.getElementById('uptime').textContent = formatUptime(uptime);
 
