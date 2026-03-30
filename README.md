@@ -1,24 +1,36 @@
 # 💧 Atomiser - Smart Humidity Controller
 
-An advanced, ESP32-based Smart Humidifier/Atomiser controller. It features a full real-time web dashboard with radial gauges, sparkline charts, smart scheduling, gas/safety thresholds, and automated environmental control.
+An advanced, ESP32-based Smart Humidifier/Atomiser controller and environmental monitoring system. It features a full real-time web dashboard with radial gauges, sparkline charts, smart scheduling, gas/safety thresholds, and automated environmental control. The system acts as a robust IoT platform that not only controls an atomiser but also logs, visualizes, and safeguards your environment.
 
 ![Dashboard Preview](https://img.shields.io/badge/Status-Active-brightgreen) ![License: MIT](https://img.shields.io/badge/License-MIT-blue) ![C++](https://img.shields.io/badge/Firmware-PlatformIO-orange) ![Node.js](https://img.shields.io/badge/Backend-Node.js-green)
 
 ---
 
-## 🌟 Features
+## 🌟 Comprehensive Features
 
-*   **Real-time Monitoring** - Live Temperature, Humidity, Gas Levels, and Water Levels pushed instantly over WebSockets.
-*   **Auto Mode** - Set a target humidity threshold; the ESP32 will automatically turn the atomiser on or off to maintain perfect conditions.
-*   **Safety Overrides** - Built-in MQ Gas Sensor tracking. If toxic gas or smoke exceeds limits, the atomiser is forcibly disabled to prevent fire hazards.
-*   **OLED On-Device Display** - See live stats directly on the physical hardware via an I2C 128x64 display.
-*   **Beautiful Dashboard** - Radial gauges, sparklines, responsive UI, Dark/Light modes, and historic line charts built with zero external dependencies.
-*   **Derived Climate Metrics** - Calculates Dew Point, Heat Index, Absolute Humidity, and Vapor Pressure Deficit (VPD).
-*   **Event Logging & Export** - View a history of ON/OFF triggers and export history to CSV or JSON.
+### 📡 Real-time Monitoring & UI
+*   **Live Sensor Feed** - Temperature, Humidity, Gas Levels, and Water Levels are pushed instantly from the ESP32 to the dashboard over WebSockets.
+*   **Beautiful Dashboard** - Built with zero external dependencies, featuring smooth radial gauges, animated sparklines, responsive UI, Dark/Light modes, and historic line charts.
+*   **Derived Climate Metrics** - Automatically calculates advanced environmental data points: Dew Point, Heat Index, Absolute Humidity (g/m³), and Vapor Pressure Deficit (VPD).
+*   **OLED On-Device Display** - See live stats directly on the physical hardware via an I2C 128x64 display. No need to open the web dashboard for a quick glance.
+
+### 🤖 Automation & Control
+*   **Auto Mode** - Set a target humidity threshold (e.g., 60%). The ESP32 will automatically turn the atomiser on or off to relentlessly maintain perfect atmospheric conditions.
+*   **Manual Override** - Instantly toggle the atomiser module from the web interface for manual control.
+
+### 🛡️ Built-in Safety Overrides
+*   **Toxic Gas & Smoke Detection** - Built-in MQ Gas Sensor tracking. If toxic gas, smoke, or combustible fumes exceed safety limits (analog reading > 2500), the atomiser is forcibly disabled immediately to prevent fire hazards.
+*   **Water Level Monitoring** - Warns users of water levels to ensure the atomiser does not run dry, helping you maintain the longevity of the ultrasonic module.
+
+### 📊 Data Logging & Export
+*   **Event Logging** - Keep track of exactly when the atomiser was turned ON/OFF, and whether it was triggered manually or by Auto Mode.
+*   **Data Export** - Export your historical environment data to CSV or JSON formats for external data analysis (in software like Excel or Python).
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture Design
+
+The project uses a reliable, decoupled two-tier WebSocket architecture:
 
 ```text
 ┌─────────────────┐       WebSocket (81)       ┌─────────────────┐       WebSocket (3001)       ┌─────────────────┐
@@ -27,6 +39,10 @@ An advanced, ESP32-based Smart Humidifier/Atomiser controller. It features a ful
 │  + MOSFET Power │ ◄────────────────────────► │   + JSON Store  │ ◄────────────────────────► │   (Browser)   │
 └─────────────────┘                            └─────────────────┘                              └─────────────────┘
 ```
+
+1. **ESP32 Edge Node**: Connects directly to hardware. Constantly reads sensors, drives the OLED display, triggers the atomiser via MOSFET, and hosts its own raw WebSocket/REST server.
+2. **Node.js Bridge**: Connects to the ESP32's IP address. It archives historical data into local JSON files, caches responses, and serves the web dashboard to the user.
+3. **Frontend Dashboard**: A lightweight, vanilla JavaScript single-page application that connects to the Node.js backend.
 
 ---
 
@@ -94,18 +110,18 @@ For a full step-by-step tutorial on cloning, flashing the ESP32, and running the
 ```text
 Atomiser/
 ├── firmware/
-│   ├── platformio.ini          # PlatformIO config
+│   ├── platformio.ini          # PlatformIO config definitions
 │   └── src/
-│       ├── config.h            # WiFi, pin mappings, default thresholds
-│       └── main.cpp            # C++ ESP32 Code
+│       ├── config.h            # WiFi configs, pin mappings, default thresholds
+│       └── main.cpp            # C++ ESP32 Code (Arduino Framework)
 ├── backend/
 │   ├── package.json            # Node.js dependencies
 │   ├── server.js               # Express + WebSocket relay + JSON Database
-│   └── data/                   # Runtime JSON logging (auto-created)
+│   └── data/                   # Runtime JSON logging (readings.json, events.json)
 ├── frontend/
-│   ├── index.html              # Beautiful UI
-│   ├── style.css               # Theming & Layout
-│   ├── app.js                  # Frontend logic & API handling
+│   ├── index.html              # Beautiful UI layout
+│   ├── style.css               # Theming & CSS Variables
+│   ├── app.js                  # Frontend logic, WebSocket handling & API
 │   └── chart.js                # Custom zero-dependency canvas renderer
 ├── README.md                   # This file
 └── SETUP_GUIDE.md              # Detailed new-user startup guide
@@ -116,7 +132,11 @@ Atomiser/
 ## 🛠️ Troubleshooting
 
 **"ESP32 Unreachable" Error on Dashboard:**
-The Node backend cannot route traffic to the ESP32. Provide the correct local IP using the Settings modal on the dashboard, or restart `server.js` with the correct `$env:ESP32_IP` system variable.
+The Node backend cannot route traffic to the ESP32. Provide the correct local IP using the Settings modal on the dashboard, or restart `server.js` with the correct `$env:ESP32_IP` system variable. 
+*Tip: Check your serial monitor after flashing to obtain the dynamically assigned DHCP IP address of the ESP32!*
 
 **Atomiser clicks 'ON' but immediately turns 'OFF':**
 Check the Dashboard's **"System Safety"** panel. If the Gas Sensor analog value exceeds `2500`, the ESP32 permanently forces the Atomiser `OFF` as a hardcoded safety override to prevent hazards. Check your wiring on GPIO 39.
+
+**Dashboard shows NaN or -1 values:**
+This means the DHT11 sensor is either unplugged, wired incorrectly, or faulty. Double check that the data pin sits exactly on `GPIO 4`.
