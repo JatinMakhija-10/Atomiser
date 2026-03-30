@@ -1,154 +1,123 @@
-# Atomiser - Smart Humidity Controller
+# ?? Atomiser - Smart Humidity Controller
 
-ESP32-based atomiser/humidifier controller with a real-time web dashboard featuring radial gauges, sparkline charts, schedule automation, data export, light/dark themes, and derived climate metrics.
+An advanced, ESP32-based Smart Humidifier/Atomiser controller. It features a full real-time web dashboard with radial gauges, sparkline charts, smart scheduling, gas/safety thresholds, and automated environmental control.
 
-## Architecture
+![Dashboard Preview](https://img.shields.io/badge/Status-Active-brightgreen) ![License: MIT](https://img.shields.io/badge/License-MIT-blue) ![C++](https://img.shields.io/badge/Firmware-PlatformIO-orange) ![Node.js](https://img.shields.io/badge/Backend-Node.js-green)
 
-```
-┌─────────────────┐       WebSocket (81)       ┌─────────────────┐       WebSocket (3001)       ┌──────────────┐
-│     ESP32        │ ◄──────────────────────►   │   Node.js       │ ◄──────────────────────►     │   Frontend    │
-│  DHT11 + MOSFET  │       REST API (80)        │   Backend       │       REST API (3000)        │   Dashboard   │
-│  + Atomiser      │ ◄──────────────────────►   │   + JSON Store  │ ◄──────────────────────►     │   (Browser)   │
-└─────────────────┘                             └─────────────────┘                              └──────────────┘
-```
+---
 
-## Hardware Connections
+## ?? Features
+
+*   **Real-time Monitoring** - Live Temperature, Humidity, Gas Levels, and Water Levels pushed instantly over WebSockets.
+*   **Auto Mode** - Set a target humidity threshold; the ESP32 will automatically turn the atomiser on or off to maintain perfect conditions.
+*   **Safety Overrides** - Built-in MQ Gas Sensor tracking. If toxic gas or smoke exceeds limits, the atomiser is forcibly disabled to prevent fire hazards.
+*   **OLED On-Device Display** - See live stats directly on the physical hardware via an I2C 128x64 display.
+*   **Beautiful Dashboard** - Radial gauges, sparklines, responsive UI, Dark/Light modes, and historic line charts built with zero external dependencies.
+*   **Derived Climate Metrics** - Calculates Dew Point, Heat Index, Absolute Humidity, and Vapor Pressure Deficit (VPD).
+*   **Event Logging & Export** - View a history of ON/OFF triggers and export history to CSV or JSON.
+
+---
+
+## ??? Architecture
+
+`	ext
++-----------------+       WebSocket (81)       +-----------------+       WebSocket (3001)       +-----------------+
+�     ESP32       � ?------------------------? �   Node.js       � ?------------------------? �   Frontend    �
+�  Sensors + OLED �       REST API (80)        �   Backend       �       REST API (3000)        �   Dashboard   �
+�  + MOSFET Power � ?------------------------? �   + JSON Store  � ?------------------------? �   (Browser)   �
++-----------------+                            +-----------------+                              +-----------------+
+`
+
+---
+
+## ?? Hardware Setup & Pin Map
+
+Here is the exact schematic connection required for this project.
+
+### Power Distribution
+*   **3V3** ? DHT Sensor, Water Level Sensor, OLED Display.
+*   **VIN (5V)** ? MQ Gas Sensor.
+*   **GND** ? Must be shared across ALL modules, the ESP32, and the MOSFET power supply.
+
+### Module Pin Mappings
 
 | Component | ESP32 Pin | Notes |
-|-----------|-----------|-------|
-| DHT11 Data | GPIO 4 | 10kΩ pull-up resistor to 3.3V |
-| MOSFET Gate | GPIO 5 | Controls atomiser power |
-| MOSFET Drain | Atomiser (-) | N-channel MOSFET (e.g., IRLZ44N) |
-| MOSFET Source | GND | Common ground |
-| Atomiser (+) | 5V/12V supply | Match your atomiser voltage |
+| :--- | :--- | :--- |
+| **DHT11 Data** | GPIO 4 | Temperature & Humidity Sensor |
+| **Water Level Sensor** | GPIO 36 (VP) | Analog read for water tank depth |
+| **MQ Gas Sensor** | GPIO 39 (VN) | Analog read for smoke/gas safety override |
+| **OLED (SDA)** | GPIO 21 | I2C Display Data |
+| **OLED (SCL)** | GPIO 22 | I2C Display Clock |
+| **MOSFET Gate** | GPIO 18 | Triggers the Atomiser. Add a 10kO pull-down resistor + 220O trace. |
 
-## Quick Start
+**?? Critical Hardware Warnings:**
+*   Never draw power for the Atomiser Module directly from the ESP32 pins. Use a dedicated 5V/12V external power supply through the MOSFET.
+*   Do not apply 5V logic to input-only pins like GPIO 36 or 39.
 
-### Prerequisites
+---
 
-- **Node.js** (v16 or higher)
-- **PlatformIO** (for flashing ESP32 firmware)
-- **ESP32 dev board** + DHT11 sensor + N-channel MOSFET + atomiser module
+## ?? Installation & Setup
 
-### 1. Clone the Repository
+For a full step-by-step tutorial on cloning, flashing the ESP32, and running the node server from scratch, please see the **[SETUP_GUIDE.md](./SETUP_GUIDE.md)**!
 
-```bash
-git clone https://github.com/JatinMakhija-10/Atomiser.git
-cd Atomiser
-```
+### Quick Start Overview:
+1.  **Clone the Repo**: git clone https://github.com/JatinMakhija-10/Atomiser.git
+2.  **Flash Firmware**: Edit your WiFi credentials in irmware/src/config.h, then use PlatformIO to pio run -t upload.
+3.  **Start Backend**: Navigate to ackend/, run 
+pm install, then set the ESP32 IP dynamic variable:
+    `powershell
+    $env:ESP32_IP="192.168.1.X"; node server.js
+    `
+4.  **Open Dashboard**: Go to http://localhost:3000 in your web browser.
 
-### 2. Flash ESP32 Firmware
+---
 
-```bash
-cd firmware
+## ?? API Reference
 
-# Edit WiFi credentials
-# Open src/config.h and set WIFI_SSID and WIFI_PASSWORD
-
-# Build and upload (requires PlatformIO)
-pio run --target upload
-
-# Monitor serial output
-pio device monitor
-```
-
-### 3. Start Backend Server
-
-```bash
-cd backend
-npm install
-npm start
-```
-
-Set ESP32 IP via environment variable:
-```bash
-# Windows
-set ESP32_IP=192.168.1.100
-npm start
-
-# Linux/Mac
-ESP32_IP=192.168.1.100 npm start
-```
-
-### 4. Open Dashboard
-
-Navigate to `http://localhost:3000` in your browser. The backend serves the frontend automatically.
-
-## API Reference
-
-### ESP32 Direct API (port 80)
-
+### ESP32 Direct API (Internal Network - Port 80)
 | Method | Endpoint | Body | Description |
 |--------|----------|------|-------------|
-| GET | `/api/status` | - | Current sensor data & state |
-| POST | `/api/atomiser` | `{"state": true}` | Turn atomiser on/off |
-| POST | `/api/config` | `{"autoMode": true, "threshold": 65}` | Set auto mode & threshold |
+| GET | /api/status | - | Returns full JSON of all sensors and current states. |
+| POST | /api/atomiser | {"state": true} | Force turns atomiser on or off (subject to safety limits). |
+| POST | /api/config | {"autoMode": true, "threshold": 60} | Sets automation thresholds. |
 
-### Backend API (port 3000)
-
+### Node.js Backend API (Dashboard Facing - Port 3000)
 | Method | Endpoint | Body | Description |
 |--------|----------|------|-------------|
-| GET | `/api/status` | - | Latest cached status |
-| GET | `/api/readings?limit=100` | - | Historical sensor readings |
-| GET | `/api/events?limit=50` | - | Event log |
-| POST | `/api/atomiser` | `{"state": true}` | Toggle atomiser (proxied to ESP32) |
-| POST | `/api/config` | `{"autoMode": true, "threshold": 65}` | Update config (proxied to ESP32) |
-| POST | `/api/esp32-ip` | `{"ip": "192.168.1.100"}` | Change ESP32 IP at runtime |
+| GET | /api/status | - | Returns cached status. |
+| GET | /api/readings | - | Returns historic JSON array data for the chart. |
+| POST | /api/esp32-ip | {"ip": "192.168.1.X"} | Change target ESP32 IP dynamically without restarting backend. |
 
-## Features
+---
 
-- **Real-time monitoring** - Temperature & humidity via WebSocket with radial gauges
-- **Sparkline charts** - Mini trend charts in each gauge card
-- **Manual control** - Turn atomiser on/off from dashboard
-- **Auto mode** - Automatic humidity control with configurable threshold + hysteresis
-- **History charts** - 1H / 6H / 24H sensor data with toggleable lines & tooltip
-- **Schedule automation** - Set daily on/off schedules (persisted in localStorage)
-- **Data export** - Export readings as CSV or JSON
-- **Light/Dark themes** - Toggle with Ctrl+T or the theme button
-- **Derived metrics** - Dew point, heat index, absolute humidity, VPD, comfort level
-- **Alert thresholds** - Custom temperature & humidity danger limits
-- **Temperature units** - Switch between °C and °F
-- **Min/Max tracking** - Track extremes with one-click reset
-- **Event logging** - Filterable event log with type badges
-- **Fullscreen mode** - Immersive dashboard view
-- **Responsive** - Works on mobile & desktop
-- **No external CDN** - Zero frontend dependencies, custom canvas charts
+## ?? Project Structure
 
-## File Structure
-
-```
+`	ext
 Atomiser/
-├── firmware/
-│   ├── platformio.ini          # PlatformIO config
-│   └── src/
-│       ├── config.h            # WiFi, pin, and default settings
-│       └── main.cpp            # ESP32 firmware
-├── backend/
-│   ├── package.json            # Node.js dependencies
-│   ├── package-lock.json       # Locked dependency versions
-│   ├── server.js               # Express + WebSocket + JSON store
-│   └── data/                   # Runtime JSON data (auto-created)
-├── frontend/
-│   ├── index.html              # Dashboard HTML (v2.0)
-│   ├── style.css               # Light/dark theme styles
-│   ├── app.js                  # Dashboard logic, gauges, schedules, export
-│   └── chart.js                # Custom canvas chart + sparkline class
-└── README.md
-```
++-- firmware/
+�   +-- platformio.ini          # PlatformIO config
+�   +-- src/
+�       +-- config.h            # WiFi, pin mappings, default thresholds
+�       +-- main.cpp            # C++ ESP32 Code
++-- backend/
+�   +-- package.json            # Node.js dependencies
+�   +-- server.js               # Express + WebSocket relay + JSON Database
+�   +-- data/                   # Runtime JSON logging (auto-created)
++-- frontend/
+�   +-- index.html              # Beautiful UI
+�   +-- style.css               # Theming & Layout
+�   +-- app.js                  # Frontend logic & API handling
+�   +-- chart.js                # Custom zero-dependency canvas renderer
++-- README.md                   # This file
++-- SETUP_GUIDE.md              # Detailed new-user startup guide
+`
 
-## Configuration
+---
 
-Edit `firmware/src/config.h` to set:
-- `WIFI_SSID` / `WIFI_PASSWORD` - Your WiFi network
-- `DHT_PIN` (default: GPIO 4) - DHT11 data pin
-- `MOSFET_PIN` (default: GPIO 5) - MOSFET gate pin
-- `DEFAULT_HUMIDITY_THRESHOLD` (default: 60%) - Auto mode threshold
+## ??? Troubleshooting
 
-## Troubleshooting
+**"ESP32 Unreachable" Error on Dashboard:**
+The Node backend cannot route traffic to the ESP32. Provide the correct local IP using the Settings modal on the dashboard, or restart server.js with the correct $env:ESP32_IP system variable.
 
-| Issue | Solution |
-|-------|----------|
-| `npm install` fails | Make sure Node.js v16+ is installed |
-| Can't connect to ESP32 | Check WiFi credentials in `config.h`, ensure ESP32 is on the same network |
-| Dashboard shows "Disconnected" | Set ESP32 IP via the dashboard settings or `ESP32_IP` env variable |
-| Port 3000 in use | `npx kill-port 3000` or change port in `server.js` |
+**Atomiser clicks 'ON' but immediately turns 'OFF':**
+Check the Dashboard's **"System Safety"** panel. If the Gas Sensor analog value exceeds 2500, the ESP32 permanently forces the Atomiser OFF as a hardcoded safety override to prevent hazards. Check your wiring on GPIO 39.
